@@ -1,0 +1,93 @@
+name: CI
+
+on:
+  push:
+    # Run on the main branch
+    branches:
+      - main
+
+jobs:
+
+  fmt:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check formatting
+        run: |
+          cargo fmt --check
+
+  test:
+
+    strategy:
+      matrix:
+
+        rust:
+          - stable
+          - "1.74" # MSRV
+
+        os:
+          - ubuntu-latest
+          - windows-latest
+          - macos-latest
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/.crates.toml
+            ~/.cargo/.crates2.json
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-check-${{ matrix.rust }}-${{ hashFiles('**/Cargo.toml') }}
+
+      - name: Disable rustup auto update
+        run: |
+          rustup set auto-self-update disable
+
+      - name: Install Rust ${{ matrix.rust }}
+        run: |
+          rustup install ${{ matrix.rust }}
+          rustup default ${{ matrix.rust }}
+
+      - name: Check
+        run: cargo check --workspace ${{ matrix.args }}
+
+      - name: Test
+        run: cargo test --workspace ${{ matrix.args }} -- --nocapture
+
+      - name: Setup cargo-binstall (Linux)
+        if: runner.os != 'Windows'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          curl -L --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh | bash
+
+      - name: Setup cargo-binstall (Windows)
+        if: runner.os == 'Windows'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          Set-ExecutionPolicy Unrestricted -Scope Process; iex (iwr "https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.ps1").Content
+
+      - name: Create SBOM
+        shell: bash
+        run: |
+          cargo cyclonedx -v --spec-version 1.5 --format json --describe binaries --target "${{ matrix.target }}"
+
+      - name: Upload SBOMs
+        uses: ctron/trustify-upload-action@v1
+        with:
+          target: https://trustify.dentrassi.de/api/v1/sbom
+          files: |
+            trustify-ci-example_bin.cdx.json
+          issuerUrl: https://trustify-sso.dentrassi.de/realms/trustify
+          clientId: ${{ secrets.TRUSTIFY_CLIENT_ID }}
+          clientSecret: ${{ secrets.TRUSTIFY_CLIENT_SECRET }}
