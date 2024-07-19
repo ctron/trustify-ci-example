@@ -97,3 +97,4 @@ jobs:
           issuerUrl: https://trustify-sso.dentrassi.de/realms/trustify
           clientId: ${{ secrets.TRUSTIFY_CLIENT_ID }}
           clientSecret: ${{ secrets.TRUSTIFY_CLIENT_SECRET }}
+          queryParameters: labels.repository=${{ github.repository }},labels.runId=${{ github.run_id }},labels.gitref=${{ github.sha }}
