@@ -86,7 +86,7 @@ jobs:
       - name: Create SBOM
         shell: bash
         run: |
-          cargo cyclonedx -v --spec-version 1.5 --format json --describe binaries --target "${{ matrix.target }}"
+          cargo cyclonedx -v --spec-version 1.5 --format json --describe binaries
 
       - name: Upload SBOMs
         uses: ctron/trustify-upload-action@v1
